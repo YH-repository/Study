@@ -8,6 +8,12 @@
 #include "oled.h"
 #include <string.h>
 
+// ================== FreeRTOS 头文件 ==================
+#include "FreeRTOS.h"
+#include "task.h"
+#include "semphr.h"
+
+
 
 #define HIGH_THRESHOLD 2000
 #define LOW_THRESHOLD  1900
@@ -19,7 +25,7 @@ uint32_t t_sensor = 0;
 uint32_t t_control = 0;
 uint32_t t_oled = 0;
 uint32_t t_uart = 0;
-uint8_t auto_flag = 0; //0是自动，1是手动
+uint8_t auto_flag = 0; // //0是自动，1是手动
 
 uint16_t analog = 0;
 uint16_t Fire = 1;
@@ -103,7 +109,7 @@ int main()
             
         }
 
-         // ===== 3. OLED任务（300ms）=====
+         //===== 3. OLED任务（300ms）=====
         if(now - t_oled >= 300)
         {
             t_oled = now;
@@ -549,3 +555,4 @@ int main()
 //     // }
   
 // }
+
