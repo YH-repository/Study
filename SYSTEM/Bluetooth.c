@@ -1,5 +1,5 @@
 #include "Bluetooth.h"
-
+#include "led.h"
 
 
 volatile char buf[BUF_SIZE];
@@ -45,8 +45,8 @@ void USART2_Init()
     //配置NVIC
     NVIC_InitTypeDef NVIC_Initstructure;
     NVIC_Initstructure.NVIC_IRQChannel = USART2_IRQn;
-    NVIC_Initstructure.NVIC_IRQChannelPreemptionPriority = 1;
-    NVIC_Initstructure.NVIC_IRQChannelSubPriority = 1;
+    NVIC_Initstructure.NVIC_IRQChannelPreemptionPriority = 7;
+    NVIC_Initstructure.NVIC_IRQChannelSubPriority = 0;
     NVIC_Initstructure.NVIC_IRQChannelCmd = ENABLE;
 
     NVIC_Init(&NVIC_Initstructure);
@@ -119,7 +119,8 @@ void USART2_IRQHandler(void)
     if(USART_GetITStatus(USART2,USART_IT_RXNE) != RESET)
     {
         char c = USART_ReceiveData(USART2);
-
+        //Led_lib_Ctrl(LED_ON);
+       // OLED_ShowString(0,6,"IN IRQ !!!",16);
         if(buf_index < BUF_SIZE - 1)
         {
             buf[buf_index++] = c;
@@ -128,6 +129,14 @@ void USART2_IRQHandler(void)
         {
             buf_index = 0;
         }
+
+        if(c == '\n')
+        {
+            cmd_ready = 1;
+        }
+
+
+        USART_ClearITPendingBit(USART2, USART_IT_RXNE);
          // ⭐ 每收到一个字符 → 重置超时
         rx_timeout = 50;   // 50ms容易粘包改小一点
         // if(c == '\r' || c == '\n' || c == ' ')

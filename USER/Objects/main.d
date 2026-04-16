@@ -48,3 +48,7 @@
 .\objects\main.o: ..\FreeRTOS\include\deprecated_definitions.h
 .\objects\main.o: ..\FreeRTOS\portable\ARM_CM3\portmacro.h
 .\objects\main.o: ..\FreeRTOS\include\mpu_wrappers.h
+.\objects\main.o: ..\FreeRTOS\include\task.h
+.\objects\main.o: ..\FreeRTOS\include\list.h
+.\objects\main.o: ..\FreeRTOS\include\semphr.h
+.\objects\main.o: ..\FreeRTOS\include\queue.h

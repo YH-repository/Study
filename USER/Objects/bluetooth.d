@@ -29,3 +29,4 @@
 .\objects\bluetooth.o: ..\FWLIB\inc\stm32f10x_usart.h
 .\objects\bluetooth.o: ..\FWLIB\inc\stm32f10x_wwdg.h
 .\objects\bluetooth.o: ..\FWLIB\inc\misc.h
+.\objects\bluetooth.o: ..\SYSTEM\led.h

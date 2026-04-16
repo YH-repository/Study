@@ -9,6 +9,7 @@
 #include <string.h>
 
 // ================== FreeRTOS 头文件 ==================
+
 #include "FreeRTOS.h"
 #include "task.h"
 #include "semphr.h"
@@ -18,24 +19,261 @@
 #define HIGH_THRESHOLD 2000
 #define LOW_THRESHOLD  1900
 
+
 static uint8_t smoke_alarm = 0;
 
-//定义时间戳
+
 uint32_t t_sensor = 0;
 uint32_t t_control = 0;
 uint32_t t_oled = 0;
 uint32_t t_uart = 0;
-uint8_t auto_flag = 0; // //0是自动，1是手动
-
-uint16_t analog = 0;
-uint16_t Fire = 1;
-uint16_t digital = 1;
+uint8_t auto_flag = 0; // //0???????1?????
 
 
-//全局时间
+
+volatile uint16_t analog = 0;
+volatile uint16_t Fire = 1;
+volatile uint16_t digital = 1;
+
+
+// // 重定向printf到串口2
+// int fputc(int ch, FILE *f)
+// {
+// 	USART_SendData(USART2, (uint8_t)ch);
+// 	while(USART_GetFlagStatus(USART2, USART_FLAG_TXE) == RESET);
+// 	return ch;
+// }
+
+
+// ================== 任务句柄 ==================
+TaskHandle_t xHandleSensor;
+TaskHandle_t xHandleControl;
+TaskHandle_t xHandleOLED;
+TaskHandle_t xHandleUART;
+
+
+/// ================== 任务1：传感器采集（100ms）==================
+void vTaskSensor(void *pvParameters)
+{
+    while(1)
+    {
+        uint32_t sum = 0;
+        for(int i=0;i<5;i++)
+        {
+            sum += MQ2_Read_Analog();
+        }
+        analog = sum / 5;
+
+        Fire = Fire_Read_Digital();
+        digital = MQ2_Read_Digital();
+        
+        vTaskDelay(100);
+        
+    }
+}
+
+
+// ================== 任务2：逻辑控制（100ms）==================
+void vTaskControl(void *pvParameters)
+{
+    while(1)
+    {
+        if(analog > HIGH_THRESHOLD)
+        {
+            smoke_alarm = 1;
+        }
+        else if(analog < LOW_THRESHOLD)
+        {
+            smoke_alarm = 0;
+        }
+
+        
+        if(smoke_alarm == 1 || digital == 0 || Fire == 0)
+        {
+            Led_lib_Ctrl(LED_ON);
+            motor_forward();//???
+            auto_flag = 1;
+                //	delay_ms(5000);
+        }
+        else
+        {
+            if (auto_flag == 1)
+            {
+                Led_lib_Ctrl(LED_OFF);
+                motor_stop();
+                auto_flag = 0;
+            }   
+        }
+
+        vTaskDelay(100);
+    }
+}
+
+
+// ================== 任务3：OLED刷新（300ms）==================
+void vTaskOLED(void *pvParameters)
+{
+    while(1)
+    {
+        if(Fire == 1)
+            OLED_ShowChinese(48,16,"无火");
+        else
+            OLED_ShowChinese(48,16,"有火");
+        if(motor_state == 0)
+            OLED_ShowChinese(80,32,"关闭");
+        else
+            OLED_ShowChinese(80,32,"打开");
+        if(light_state == 0)
+            OLED_ShowChinese(64,48,"关闭");
+        else
+            OLED_ShowChinese(64,48,"打开");
+        OLED_ShowNum(80,0,analog,4,OLED_8X16);
+        // 必须用全屏刷新，不要用 UpdateArea！！
+        //OLED_Update();
+        
+        OLED_UpdateArea(80,0,32,16);
+        OLED_UpdateArea(48,16,32,16);
+        OLED_UpdateArea(80,32,32,16);
+        OLED_UpdateArea(64,48,32,16);
+    
+        vTaskDelay(300);
+    }
+}
+
+
+// ================== 任务4：蓝牙发送 + 接收解析（10ms）==================
+void vTaskUART(void *pvParameters)
+{
+    while(1)
+    {
+        //1秒发一次
+        static uint8_t cnt = 0;
+        
+        if(cnt++ >= 100)
+        {
+            cnt = 0;
+            char buf_tx[32];
+            sprintf(buf_tx,"<S:%d,F:%d,M:%d,L:%d>\r\n", analog, Fire, motor_state, light_state);
+            USART2_SendString(buf_tx);
+        }
+        //蓝牙指令处理
+       
+        
+        if(cmd_ready)
+        {
+            
+            cmd_ready = 0;
+            // ?补结束符
+            buf[buf_index] = '\0';
+            for(int i = 0; i < buf_index; i++)
+            {
+                if(buf[i] == '\r' || buf[i] == '\n')
+                {
+                    buf[i] = '\0';
+                }
+            }
+            buf_index = 0;
+
+            if(strstr((char *)buf,"onlight") != NULL)
+            {
+               //OLED_ShowString(0,0,"ENTER ONLIGHT",16); // 测试用
+                
+                Led_lib_Ctrl(LED_ON);
+                // USART2_SendString((char *)buf);
+                auto_flag = 0;
+                
+                USART2_SendString("open success\r\n");
+				USART2_SendString("please enter the command\r\n");			
+
+            }
+            else if(strstr((char *)buf,"offlight") != NULL)
+            {
+                
+                Led_lib_Ctrl(LED_OFF);
+                auto_flag = 0;
+                
+                USART2_SendString((char *)buf);
+                USART2_SendString(" success\r\n");
+                USART2_SendString("please enter the command1\r\n");
+            }
+            else if(strstr((char *)buf,"onmotor") != NULL)
+            {
+                
+                motor_forward_pwm(1000); 
+                //light_state = 1; 
+                auto_flag = 0;
+                USART2_SendString((char *)buf);
+                USART2_SendString(" success\r\n");
+                USART2_SendString("please enter the command1\r\n");
+            }
+            else if(strstr((char *)buf,"offmotor") != NULL)
+            {
+                
+                motor_stop_pwm();
+                //light_state = 0; 
+                auto_flag = 0;
+                USART2_SendString((char *)buf);
+                USART2_SendString(" success\r\n");
+                USART2_SendString("please enter the command1\r\n");
+            }
+            else
+            {
+                USART2_SendString((char *)buf);
+                USART2_SendString(" send error!!\r\n");
+                USART2_SendString("please enter the valid command\r\n");
+            }
+			 			
+        }
+        vTaskDelay(10);
+    }
+}
+
+
+
+
+int main()
+{
+
+    NVIC_PriorityGroupConfig(NVIC_PriorityGroup_4);
+
+    OLED_GPIO_Init();
+    OLED_Init();
+    MQ2_Init();
+  
+    motor_pwm_init();
+    USART2_Init();
+    Led_lib_init();
+
+    USART2_SendString("system start\r\n");
+
+    OLED_ShowChinese(0,0,"烟雾浓度：");
+    OLED_ShowChinese(0,16,"火焰：");
+    OLED_ShowChinese(0,32,"风扇状态：");
+    OLED_ShowChinese(0,48,"灯状态：");
+    
+    OLED_Update();
+
+    // ================== 创建 FreeRTOS 任务 ==================
+    xTaskCreate(vTaskSensor,  "Sensor",  512, NULL, 2, &xHandleSensor);
+    xTaskCreate(vTaskControl, "Control", 512, NULL, 3, &xHandleControl);
+    xTaskCreate(vTaskOLED,    "OLED",    512, NULL, 1, &xHandleOLED);
+    xTaskCreate(vTaskUART,    "UART",    512, NULL, 4, &xHandleUART);
+   
+
+    // 启动调度器
+    vTaskStartScheduler();
+
+    while(1);
+}
+
+
+
+
+
+//??????
 //volatile uint32_t ms_tick = 0;
 
-
+/*
 int main()
 {
     OLED_GPIO_Init();
@@ -109,7 +347,7 @@ int main()
             
         }
 
-         //===== 3. OLED任务（300ms）=====
+         // ===== 3. OLED任务（300ms）=====
         if(now - t_oled >= 300)
         {
             t_oled = now;
@@ -207,9 +445,7 @@ int main()
     }
 }
 
-
-
-
+*/
 
 
 

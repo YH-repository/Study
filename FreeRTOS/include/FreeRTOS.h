@@ -60,6 +60,7 @@
 #define TICK_TYPE_WIDTH_32_BITS    1
 #define TICK_TYPE_WIDTH_64_BITS    2
 
+
 /* Application specific configuration options. */
 #include "FreeRTOSConfig.h"
 
