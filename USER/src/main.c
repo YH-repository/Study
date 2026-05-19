@@ -16,8 +16,8 @@
 
 
 
-#define HIGH_THRESHOLD 2000
-#define LOW_THRESHOLD  1900
+#define HIGH_THRESHOLD 2300
+#define LOW_THRESHOLD  2100
 
 
 static uint8_t smoke_alarm = 0;
@@ -31,7 +31,7 @@ uint8_t auto_flag = 0; // //0???????1?????
 
 
 
-volatile uint16_t analog = 0;
+//volatile uint16_t analog = 0;
 volatile uint16_t Fire = 1;
 volatile uint16_t digital = 1;
 
@@ -57,12 +57,12 @@ void vTaskSensor(void *pvParameters)
 {
     while(1)
     {
-        uint32_t sum = 0;
-        for(int i=0;i<5;i++)
-        {
-            sum += MQ2_Read_Analog();
-        }
-        analog = sum / 5;
+        // uint32_t sum = 0;
+        // for(int i=0;i<5;i++)
+        // {
+        //     sum += MQ2_Read_Analog();
+        // }
+        // analog = sum / 5;
 
         Fire = Fire_Read_Digital();
         digital = MQ2_Read_Digital();
@@ -240,6 +240,7 @@ int main()
     OLED_Init();
     MQ2_Init();
   
+    MQ2_NVIC_Init();
     motor_pwm_init();
     USART2_Init();
     Led_lib_init();
