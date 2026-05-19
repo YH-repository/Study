@@ -13,11 +13,12 @@
 #include "FreeRTOS.h"
 #include "task.h"
 #include "semphr.h"
+#include "queue.h"//必须放在freertos的上面
 
 
 
-#define HIGH_THRESHOLD 2300
-#define LOW_THRESHOLD  2100
+#define HIGH_THRESHOLD 3000
+#define LOW_THRESHOLD  2700
 
 
 static uint8_t smoke_alarm = 0;
@@ -29,11 +30,33 @@ uint32_t t_oled = 0;
 uint32_t t_uart = 0;
 uint8_t auto_flag = 0; // //0???????1?????
 
+//给采集任务使用
+typedef struct
+{
+    uint16_t analog;
+    uint16_t digital;
+    uint8_t Fire;
+} SensorData_t;
+
+//使用结构体存储全局变量方便后续使用队列给oled任务和蓝牙任务使用
+typedef struct
+{
+    uint16_t analog;
+    uint8_t motor;
+    uint8_t light;
+    uint8_t Fire;
+} SystemState_t;
+
+//创建队列
+QueueHandle_t xQueueSensor;
+QueueHandle_t xQueueOLED;
+QueueHandle_t xQueueUART;
 
 
 //volatile uint16_t analog = 0;
-volatile uint16_t Fire = 1;
-volatile uint16_t digital = 1;
+
+// volatile uint16_t Fire = 1;
+// volatile uint16_t digital = 1;
 
 
 // // 重定向printf到串口2
@@ -55,6 +78,7 @@ TaskHandle_t xHandleUART;
 /// ================== 任务1：传感器采集（100ms）==================
 void vTaskSensor(void *pvParameters)
 {
+    SensorData_t data;
     while(1)
     {
         // uint32_t sum = 0;
@@ -64,9 +88,12 @@ void vTaskSensor(void *pvParameters)
         // }
         // analog = sum / 5;
 
-        Fire = Fire_Read_Digital();
-        digital = MQ2_Read_Digital();
-        
+        data.analog = analog; // DMA更新的
+        data.digital = MQ2_Read_Digital();
+        data.Fire = Fire_Read_Digital();
+
+        //发送数据到队列，最后一个参数是最大等待时间（死等）
+        xQueueSend(xQueueSensor, &data, portMAX_DELAY);
         vTaskDelay(100);
         
     }
@@ -76,34 +103,54 @@ void vTaskSensor(void *pvParameters)
 // ================== 任务2：逻辑控制（100ms）==================
 void vTaskControl(void *pvParameters)
 {
+    SensorData_t sensor;
+    SystemState_t state;
     while(1)
     {
-        if(analog > HIGH_THRESHOLD)
-        {
-            smoke_alarm = 1;
-        }
-        else if(analog < LOW_THRESHOLD)
-        {
-            smoke_alarm = 0;
-        }
 
-        
-        if(smoke_alarm == 1 || digital == 0 || Fire == 0)
+        /*xQueueReceive 执行完会返回一个状态：
+            pdPASS = 读取成功，拿到数据了
+            errQUEUE_EMPTY = 读取失败，队列空的*/
+        if(xQueueReceive(xQueueSensor, &sensor, portMAX_DELAY) == pdPASS)
         {
-            Led_lib_Ctrl(LED_ON);
-            motor_forward();//???
-            auto_flag = 1;
-                //	delay_ms(5000);
-        }
-        else
-        {
-            if (auto_flag == 1)
+             
+
+            if(sensor.analog > HIGH_THRESHOLD)
             {
-                Led_lib_Ctrl(LED_OFF);
-                motor_stop();
-                auto_flag = 0;
-            }   
+                smoke_alarm = 1;
+            }
+            else if(sensor.analog < LOW_THRESHOLD)
+            {
+                smoke_alarm = 0;
+            }
+
+            
+            if(smoke_alarm == 1 || sensor.digital == 0 || sensor.Fire == 0)
+            {
+                Led_lib_Ctrl(LED_ON);
+                motor_forward();//???
+                auto_flag = 1;
+                    //	delay_ms(5000);
+            }
+            else
+            {
+                if (auto_flag == 1)
+                {
+                    Led_lib_Ctrl(LED_OFF);
+                    motor_stop();
+                    auto_flag = 0;
+                }   
+            }
+            //更新数据
+            state.analog = sensor.analog;
+            state.motor = motor_state;
+            state.light = light_state;
+            state.Fire = sensor.Fire;
+            //再发送到队列
+            xQueueOverwrite(xQueueOLED, &state);
+            xQueueOverwrite(xQueueUART, &state); 
         }
+        
 
         vTaskDelay(100);
     }
@@ -113,28 +160,34 @@ void vTaskControl(void *pvParameters)
 // ================== 任务3：OLED刷新（300ms）==================
 void vTaskOLED(void *pvParameters)
 {
+    SystemState_t state;
+
     while(1)
     {
-        if(Fire == 1)
-            OLED_ShowChinese(48,16,"无火");
-        else
-            OLED_ShowChinese(48,16,"有火");
-        if(motor_state == 0)
-            OLED_ShowChinese(80,32,"关闭");
-        else
-            OLED_ShowChinese(80,32,"打开");
-        if(light_state == 0)
-            OLED_ShowChinese(64,48,"关闭");
-        else
-            OLED_ShowChinese(64,48,"打开");
-        OLED_ShowNum(80,0,analog,4,OLED_8X16);
-        // 必须用全屏刷新，不要用 UpdateArea！！
-        //OLED_Update();
+        if(xQueueReceive(xQueueOLED,&state,0) == pdPASS)
+        {
+            if(state.Fire == 1)
+                OLED_ShowChinese(48,16,"无火");
+            else
+                OLED_ShowChinese(48,16,"有火");
+            if(state.motor == 0)
+                OLED_ShowChinese(80,32,"关闭");
+            else
+                OLED_ShowChinese(80,32,"打开");
+            if(state.light == 0)
+                OLED_ShowChinese(64,48,"关闭");
+            else
+                OLED_ShowChinese(64,48,"打开");
+            OLED_ShowNum(80,0,analog,4,OLED_8X16);
+            // 必须用全屏刷新，不要用 UpdateArea！！
+            //OLED_Update();
+            
+            OLED_UpdateArea(80,0,32,16);
+            OLED_UpdateArea(48,16,32,16);
+            OLED_UpdateArea(80,32,32,16);
+            OLED_UpdateArea(64,48,32,16);
+        }
         
-        OLED_UpdateArea(80,0,32,16);
-        OLED_UpdateArea(48,16,32,16);
-        OLED_UpdateArea(80,32,32,16);
-        OLED_UpdateArea(64,48,32,16);
     
         vTaskDelay(300);
     }
@@ -144,16 +197,20 @@ void vTaskOLED(void *pvParameters)
 // ================== 任务4：蓝牙发送 + 接收解析（10ms）==================
 void vTaskUART(void *pvParameters)
 {
+    SystemState_t state;
     while(1)
     {
         //1秒发一次
         static uint8_t cnt = 0;
         
+        //获取最新状态
+        xQueueReceive(xQueueUART,&state,0);
+
         if(cnt++ >= 100)
         {
             cnt = 0;
             char buf_tx[32];
-            sprintf(buf_tx,"<S:%d,F:%d,M:%d,L:%d>\r\n", analog, Fire, motor_state, light_state);
+            sprintf(buf_tx,"<S:%d,F:%d,M:%d,L:%d>\r\n", state.analog, state.Fire, state.motor, state.light);
             USART2_SendString(buf_tx);
         }
         //蓝牙指令处理
@@ -253,6 +310,13 @@ int main()
     OLED_ShowChinese(0,48,"灯状态：");
     
     OLED_Update();
+    
+    //创建队列要在main函数中
+    //队列长度：5，每个元素：SensorData_t
+    xQueueSensor = xQueueCreate(5, sizeof(SensorData_t));
+    xQueueOLED   = xQueueCreate(1, sizeof(SystemState_t)); // 用 overwrite
+    xQueueUART   = xQueueCreate(1, sizeof(SystemState_t));
+
 
     // ================== 创建 FreeRTOS 任务 ==================
     xTaskCreate(vTaskSensor,  "Sensor",  512, NULL, 2, &xHandleSensor);
