@@ -2,11 +2,98 @@
 #include "led.h"
 
 
-volatile char buf[BUF_SIZE];
-volatile int buf_index = 0;
+
+uint8_t rx_buffer[RX_BUFFER_SIZE];   // DMA接收缓冲区
+uint16_t rx_len = 0;                // 实际接收长度
+
+
+//volatile char buf[BUF_SIZE];
+//volatile int buf_index = 0;
 volatile uint8_t cmd_ready = 0;//接收完成标志
 
-volatile uint32_t rx_timeout = 0;   // 超时计数
+//volatile uint32_t rx_timeout = 0;   // 超时计数
+
+
+void UART_DMA_Init(void)
+{
+    RCC_AHBPeriphClockCmd(RCC_AHBPeriph_DMA1,ENABLE);
+
+    DMA_InitTypeDef DMA_InitStructure;
+
+    //把 DMA1 通道 6 恢复成出厂默认状态 → 复位清零！
+    DMA_DeInit(DMA1_Channel6);
+
+    DMA_InitStructure.DMA_PeripheralBaseAddr = (uint32_t)&USART2->DR;
+    DMA_InitStructure.DMA_MemoryBaseAddr = (uint32_t)rx_buffer;
+    DMA_InitStructure.DMA_DIR = DMA_DIR_PeripheralSRC;
+    DMA_InitStructure.DMA_BufferSize = RX_BUFFER_SIZE;
+    DMA_InitStructure.DMA_PeripheralInc = DMA_PeripheralInc_Disable;
+    DMA_InitStructure.DMA_MemoryInc = DMA_MemoryInc_Enable;
+    DMA_InitStructure.DMA_PeripheralDataSize = DMA_PeripheralDataSize_Byte;
+    DMA_InitStructure.DMA_MemoryDataSize = DMA_MemoryDataSize_Byte;
+    DMA_InitStructure.DMA_Mode = DMA_Mode_Circular;   // 🔥 循环模式
+    DMA_InitStructure.DMA_Priority = DMA_Priority_High;
+    DMA_InitStructure.DMA_M2M = DMA_M2M_Disable;
+
+    DMA_Init(DMA1_Channel6, &DMA_InitStructure);
+    DMA_Cmd(DMA1_Channel6, ENABLE);
+    //串口开启DMA接收
+    USART_DMACmd(USART2, USART_DMAReq_Rx, ENABLE);
+    //开启IDLE中断
+    USART_ITConfig(USART2, USART_IT_IDLE, ENABLE);
+
+
+
+}
+
+
+
+
+//DMA中断最好使用在固定长度数据，一次收n个字节
+void USART2_IRQHandler(void)
+{
+    if(USART_GetITStatus(USART2,USART_IT_IDLE) != RESET)
+    {
+        // 🔥 清除IDLE标志（必须这样读）
+        volatile uint32_t temp;
+        temp = USART2->SR;
+        temp = USART2->DR;
+
+
+        // 🔥 关闭DMA，计算长度
+        DMA_Cmd(DMA1_Channel6, DISABLE);
+        //DMA_GetCurrDataCounter(DMA1_Channel6)获取 DMA 通道 6 当前还剩下多少个数据没搬完。
+        rx_len = RX_BUFFER_SIZE - DMA_GetCurrDataCounter(DMA1_Channel6);
+
+        // 👉 告诉任务：数据来了
+        cmd_ready = 1;
+
+         // 🔥 重新开启DMA
+         //给 DMA 通道 6 设置【本次要传输多少个数据】= 重新装填 DMA 的 “计数器”
+        DMA_SetCurrDataCounter(DMA1_Channel6, RX_BUFFER_SIZE);
+        DMA_Cmd(DMA1_Channel6, ENABLE);
+    }
+}
+
+
+
+
+
+
+
+
+// //配置DMA，UART2_RX是DMA的channel6通道
+// void DMA1_Channel6_IRQHandler(void)
+// {
+
+// }
+
+
+
+
+
+
+
 
 //pa2------tx usart2
 //pa3------rx usart2
@@ -40,7 +127,7 @@ void USART2_Init()
     USART_Init(USART2,& USART_InitStructure);
 
     USART_Cmd(USART2,ENABLE);
-
+    UART_DMA_Init();
 
     //配置NVIC
     NVIC_InitTypeDef NVIC_Initstructure;
@@ -51,13 +138,15 @@ void USART2_Init()
 
     NVIC_Init(&NVIC_Initstructure);
 
-    //使能USART中断
-    USART_ITConfig(USART2, USART_IT_RXNE, ENABLE);/*USART_IT_RXNE：接收寄存器非空（有新数据可读）
-                                                - USART_IT_TXE：发送缓冲区空（可以发送下一个数据）
-                                                - USART_IT_TC：发送完成*/
+    // //使能USART中断
+    // //USART_ITConfig(USART2, USART_IT_RXNE, ENABLE);/*USART_IT_RXNE：接收寄存器非空（有新数据可读）
+    //                                             - USART_IT_TXE：发送缓冲区空（可以发送下一个数据）
+    //                                             - USART_IT_TC：发送完成*/
     NVIC_EnableIRQ(USART2_IRQn);   // 开启 USART2 中断,中断控制器
 
 }
+
+
 
 //发送字符
 void USART2_SendChar(char c)
@@ -69,6 +158,7 @@ void USART2_SendChar(char c)
                                                                 返回值：RESET = 0 → 标志位没发生
                                                                         SET   = 1 → 标志位发生了*/
    
+
 }
 //发送字符串
 void USART2_SendString(char *str)
@@ -78,6 +168,8 @@ void USART2_SendString(char *str)
         USART2_SendChar(*str++);
     }
 }
+
+
 
 //接收字符
 // char USART2_ReceiveChar(void)
@@ -112,7 +204,10 @@ void USART2_SendString(char *str)
 //     }
 // }
 
-
+/*
+    暂时注销
+*/
+/*
 //中断函数
 void USART2_IRQHandler(void)
 {
@@ -159,5 +254,7 @@ void USART2_IRQHandler(void)
         // }
     }
 }
+*/
+
 
 

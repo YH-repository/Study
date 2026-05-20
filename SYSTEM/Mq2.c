@@ -43,7 +43,7 @@ void MQ2_DMA_Init(void)
     DMA_InitStructure.DMA_M2M = DMA_M2M_Disable;
 
     DMA_Init(DMA1_Channel1, &DMA_InitStructure);
-
+    //开启 DMA1 通道 1 的【传输完成中断
     DMA_ITConfig(DMA1_Channel1, DMA_IT_TC, ENABLE);
 
     DMA_Cmd(DMA1_Channel1, ENABLE);

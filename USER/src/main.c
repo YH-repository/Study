@@ -17,8 +17,8 @@
 
 
 
-#define HIGH_THRESHOLD 3000
-#define LOW_THRESHOLD  2700
+#define HIGH_THRESHOLD 2000
+#define LOW_THRESHOLD  1700
 
 
 static uint8_t smoke_alarm = 0;
@@ -94,7 +94,7 @@ void vTaskSensor(void *pvParameters)
 
         //发送数据到队列，最后一个参数是最大等待时间（死等）
         xQueueSend(xQueueSensor, &data, portMAX_DELAY);
-        vTaskDelay(100);
+        vTaskDelay(pdMS_TO_TICKS(100));
         
     }
 }
@@ -152,7 +152,7 @@ void vTaskControl(void *pvParameters)
         }
         
 
-        vTaskDelay(100);
+        vTaskDelay(pdMS_TO_TICKS(100));
     }
 }
 
@@ -178,7 +178,7 @@ void vTaskOLED(void *pvParameters)
                 OLED_ShowChinese(64,48,"关闭");
             else
                 OLED_ShowChinese(64,48,"打开");
-            OLED_ShowNum(80,0,analog,4,OLED_8X16);
+            OLED_ShowNum(80,0,state.analog,4,OLED_8X16);
             // 必须用全屏刷新，不要用 UpdateArea！！
             //OLED_Update();
             
@@ -189,7 +189,7 @@ void vTaskOLED(void *pvParameters)
         }
         
     
-        vTaskDelay(300);
+        vTaskDelay(pdMS_TO_TICKS(300));
     }
 }
 
@@ -203,8 +203,8 @@ void vTaskUART(void *pvParameters)
         //1秒发一次
         static uint8_t cnt = 0;
         
-        //获取最新状态
-        xQueueReceive(xQueueUART,&state,0);
+        //获取最新状态,Peek：复制了数据但是仍留下一个副本
+        xQueuePeek(xQueueUART,&state,0);
 
         if(cnt++ >= 100)
         {
@@ -213,6 +213,8 @@ void vTaskUART(void *pvParameters)
             sprintf(buf_tx,"<S:%d,F:%d,M:%d,L:%d>\r\n", state.analog, state.Fire, state.motor, state.light);
             USART2_SendString(buf_tx);
         }
+
+      
         //蓝牙指令处理
        
         
@@ -221,17 +223,18 @@ void vTaskUART(void *pvParameters)
             
             cmd_ready = 0;
             // ?补结束符
-            buf[buf_index] = '\0';
-            for(int i = 0; i < buf_index; i++)
-            {
-                if(buf[i] == '\r' || buf[i] == '\n')
-                {
-                    buf[i] = '\0';
-                }
-            }
-            buf_index = 0;
+            rx_buffer[rx_len] = '\0';
+            // buf[buf_index] = '\0';
+            // for(int i = 0; i < buf_index; i++)
+            // {
+            //     if(buf[i] == '\r' || buf[i] == '\n')
+            //     {
+            //         buf[i] = '\0';
+            //     }
+            // }
+            // buf_index = 0;
 
-            if(strstr((char *)buf,"onlight") != NULL)
+            if(strstr((char *)rx_buffer,"onlight") != NULL)
             {
                //OLED_ShowString(0,0,"ENTER ONLIGHT",16); // 测试用
                 
@@ -243,45 +246,45 @@ void vTaskUART(void *pvParameters)
 				USART2_SendString("please enter the command\r\n");			
 
             }
-            else if(strstr((char *)buf,"offlight") != NULL)
+            else if(strstr((char *)rx_buffer,"offlight") != NULL)
             {
                 
                 Led_lib_Ctrl(LED_OFF);
                 auto_flag = 0;
                 
-                USART2_SendString((char *)buf);
+                USART2_SendString((char *)rx_buffer);
                 USART2_SendString(" success\r\n");
                 USART2_SendString("please enter the command1\r\n");
             }
-            else if(strstr((char *)buf,"onmotor") != NULL)
+            else if(strstr((char *)rx_buffer,"onmotor") != NULL)
             {
                 
                 motor_forward_pwm(1000); 
                 //light_state = 1; 
                 auto_flag = 0;
-                USART2_SendString((char *)buf);
+                USART2_SendString((char *)rx_buffer);
                 USART2_SendString(" success\r\n");
                 USART2_SendString("please enter the command1\r\n");
             }
-            else if(strstr((char *)buf,"offmotor") != NULL)
+            else if(strstr((char *)rx_buffer,"offmotor") != NULL)
             {
                 
                 motor_stop_pwm();
                 //light_state = 0; 
                 auto_flag = 0;
-                USART2_SendString((char *)buf);
+                USART2_SendString((char *)rx_buffer);
                 USART2_SendString(" success\r\n");
                 USART2_SendString("please enter the command1\r\n");
             }
             else
             {
-                USART2_SendString((char *)buf);
+                USART2_SendString((char *)rx_buffer);
                 USART2_SendString(" send error!!\r\n");
                 USART2_SendString("please enter the valid command\r\n");
             }
 			 			
         }
-        vTaskDelay(10);
+        vTaskDelay(pdMS_TO_TICKS(10));
     }
 }
 
