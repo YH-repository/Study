@@ -724,6 +724,16 @@
               <FileType>5</FileType>
               <FilePath>..\SYSTEM\OLED_Data.h</FilePath>
             </File>
+            <File>
+              <FileName>IWDG.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\SYSTEM\IWDG.c</FilePath>
+            </File>
+            <File>
+              <FileName>IWDG.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\SYSTEM\IWDG.h</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>

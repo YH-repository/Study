@@ -14,7 +14,7 @@
 #include "task.h"
 #include "semphr.h"
 #include "queue.h"//必须放在freertos的上面
-
+#include "IWDG.h"
 
 
 #define HIGH_THRESHOLD 2000
@@ -23,12 +23,32 @@
 
 static uint8_t smoke_alarm = 0;
 
+//裸机开发时使用
+// uint32_t t_sensor = 0;
+// uint32_t t_control = 0;
+// uint32_t t_oled = 0;
+// uint32_t t_uart = 0;
+//uint8_t auto_flag = 0; // //0???????1?????
 
-uint32_t t_sensor = 0;
-uint32_t t_control = 0;
-uint32_t t_oled = 0;
-uint32_t t_uart = 0;
-uint8_t auto_flag = 0; // //0???????1?????
+typedef enum
+{
+    STATE_IDLE,        // 空闲（手动控制）
+    STATE_AUTO_ACTIVE  // 自动控制中
+} SystemState;
+
+
+
+/*
+// ================== 控制意图 ==================
+uint8_t manual_motor = 0;
+uint8_t manual_light = 0;
+
+uint8_t auto_motor = 0;
+uint8_t auto_light = 0;
+*/
+
+
+
 
 //给采集任务使用
 typedef struct
@@ -105,40 +125,49 @@ void vTaskControl(void *pvParameters)
 {
     SensorData_t sensor;
     SystemState_t state;
+
+    SystemState states = STATE_IDLE;
     while(1)
     {
 
         /*xQueueReceive 执行完会返回一个状态：
             pdPASS = 读取成功，拿到数据了
             errQUEUE_EMPTY = 读取失败，队列空的*/
+        
         if(xQueueReceive(xQueueSensor, &sensor, portMAX_DELAY) == pdPASS)
         {
-             
+             IWDG_ReloadCounter();
 
             if(sensor.analog > HIGH_THRESHOLD)
             {
                 smoke_alarm = 1;
+                // auto_motor = 1;
+                // auto_light = 1;
             }
             else if(sensor.analog < LOW_THRESHOLD)
             {
                 smoke_alarm = 0;
+                // auto_motor = 0;
+                // auto_light = 0;
             }
 
-            
-            if(smoke_alarm == 1 || sensor.digital == 0 || sensor.Fire == 0)
+            uint8_t danger = (smoke_alarm == 1) || 
+                             (sensor.digital == 0) || 
+                             (sensor.Fire == 0);
+            if(danger)
             {
                 Led_lib_Ctrl(LED_ON);
                 motor_forward();//???
-                auto_flag = 1;
+                states = STATE_AUTO_ACTIVE;
                     //	delay_ms(5000);
             }
             else
             {
-                if (auto_flag == 1)
+                if (states == STATE_AUTO_ACTIVE)
                 {
                     Led_lib_Ctrl(LED_OFF);
                     motor_stop();
-                    auto_flag = 0;
+                    states = STATE_IDLE;
                 }   
             }
             //更新数据
@@ -240,7 +269,7 @@ void vTaskUART(void *pvParameters)
                 
                 Led_lib_Ctrl(LED_ON);
                 // USART2_SendString((char *)buf);
-                auto_flag = 0;
+                //auto_flag = 0;
                 
                 USART2_SendString("open success\r\n");
 				USART2_SendString("please enter the command\r\n");			
@@ -250,7 +279,7 @@ void vTaskUART(void *pvParameters)
             {
                 
                 Led_lib_Ctrl(LED_OFF);
-                auto_flag = 0;
+                //auto_flag = 0;
                 
                 USART2_SendString((char *)rx_buffer);
                 USART2_SendString(" success\r\n");
@@ -261,7 +290,7 @@ void vTaskUART(void *pvParameters)
                 
                 motor_forward_pwm(1000); 
                 //light_state = 1; 
-                auto_flag = 0;
+                //auto_flag = 0;
                 USART2_SendString((char *)rx_buffer);
                 USART2_SendString(" success\r\n");
                 USART2_SendString("please enter the command1\r\n");
@@ -271,7 +300,7 @@ void vTaskUART(void *pvParameters)
                 
                 motor_stop_pwm();
                 //light_state = 0; 
-                auto_flag = 0;
+                //auto_flag = 0;
                 USART2_SendString((char *)rx_buffer);
                 USART2_SendString(" success\r\n");
                 USART2_SendString("please enter the command1\r\n");
@@ -304,6 +333,7 @@ int main()
     motor_pwm_init();
     USART2_Init();
     Led_lib_init();
+    IWDG_Init();
 
     USART2_SendString("system start\r\n");
 

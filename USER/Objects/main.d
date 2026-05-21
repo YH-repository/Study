@@ -52,3 +52,4 @@
 .\objects\main.o: ..\FreeRTOS\include\list.h
 .\objects\main.o: ..\FreeRTOS\include\semphr.h
 .\objects\main.o: ..\FreeRTOS\include\queue.h
+.\objects\main.o: ..\SYSTEM\IWDG.h

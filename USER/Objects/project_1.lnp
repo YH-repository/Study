@@ -32,6 +32,7 @@
 ".\objects\bluetooth.o"
 ".\objects\oled.o"
 ".\objects\oled_data.o"
+".\objects\iwdg.o"
 ".\objects\main.o"
 ".\objects\stm32f10x_it.o"
 ".\objects\system_stm32f10x_1.o"
