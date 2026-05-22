@@ -69,8 +69,8 @@ typedef struct
 
 //创建队列
 QueueHandle_t xQueueSensor;
-QueueHandle_t xQueueOLED;
-QueueHandle_t xQueueUART;
+QueueHandle_t xQueueState;
+//QueueHandle_t xQueueUART;
 
 
 //volatile uint16_t analog = 0;
@@ -176,8 +176,7 @@ void vTaskControl(void *pvParameters)
             state.light = light_state;
             state.Fire = sensor.Fire;
             //再发送到队列
-            xQueueOverwrite(xQueueOLED, &state);
-            xQueueOverwrite(xQueueUART, &state); 
+            xQueueOverwrite(xQueueState, &state); 
         }
         
 
@@ -193,7 +192,7 @@ void vTaskOLED(void *pvParameters)
 
     while(1)
     {
-        if(xQueueReceive(xQueueOLED,&state,0) == pdPASS)
+        if(xQueueReceive(xQueueState,&state,0) == pdPASS)
         {
             if(state.Fire == 1)
                 OLED_ShowChinese(48,16,"无火");
@@ -233,7 +232,7 @@ void vTaskUART(void *pvParameters)
         static uint8_t cnt = 0;
         
         //获取最新状态,Peek：复制了数据但是仍留下一个副本
-        xQueuePeek(xQueueUART,&state,0);
+        xQueuePeek(xQueueState,&state,0);
 
         if(cnt++ >= 100)
         {
@@ -347,8 +346,9 @@ int main()
     //创建队列要在main函数中
     //队列长度：5，每个元素：SensorData_t
     xQueueSensor = xQueueCreate(5, sizeof(SensorData_t));
-    xQueueOLED   = xQueueCreate(1, sizeof(SystemState_t)); // 用 overwrite
-    xQueueUART   = xQueueCreate(1, sizeof(SystemState_t));
+    //用 overwrite,xQueueState 用 长度=1（关键！）是为了获取的是最新的数据
+    xQueueState  = xQueueCreate(1, sizeof(SystemState_t)); 
+    //xQueueUART   = xQueueCreate(1, sizeof(SystemState_t));
 
 
     // ================== 创建 FreeRTOS 任务 ==================

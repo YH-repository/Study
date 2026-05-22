@@ -142,7 +142,7 @@ void USART2_Init()
     // //USART_ITConfig(USART2, USART_IT_RXNE, ENABLE);/*USART_IT_RXNE：接收寄存器非空（有新数据可读）
     //                                             - USART_IT_TXE：发送缓冲区空（可以发送下一个数据）
     //                                             - USART_IT_TC：发送完成*/
-    NVIC_EnableIRQ(USART2_IRQn);   // 开启 USART2 中断,中断控制器
+    //NVIC_EnableIRQ(USART2_IRQn);   // 开启 USART2 中断,中断控制器
 
 }
 

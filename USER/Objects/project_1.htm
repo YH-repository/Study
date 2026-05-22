@@ -3,7 +3,7 @@
 <title>Static Call Graph - [.\Objects\project_1.axf]</title></head>
 <body><HR>
 <H1>Static Call Graph for image .\Objects\project_1.axf</H1><HR>
-<BR><P>#&#060CALLGRAPH&#062# ARM Linker, 5060960: Last Updated: Thu May 21 15:55:45 2026
+<BR><P>#&#060CALLGRAPH&#062# ARM Linker, 5060960: Last Updated: Fri May 22 10:57:20 2026
 <BR><P>
 <H3>Maximum Stack Usage =        256 bytes + Unknown(Functions without stacksize, Cycles, Untraceable Function Pointers)</H3><H3>
 Call chain for Maximum Stack Depth:</H3>
@@ -1049,7 +1049,7 @@ Global Symbols
 </UL>
 <BR>[Address Reference Count : 1]<UL><LI> startup_stm32f10x_md.o(RESET)
 </UL>
-<P><STRONG><a name="[a5]"></a>USART2_Init</STRONG> (Thumb, 174 bytes, Stack size 32 bytes, bluetooth.o(i.USART2_Init))
+<P><STRONG><a name="[a5]"></a>USART2_Init</STRONG> (Thumb, 150 bytes, Stack size 32 bytes, bluetooth.o(i.USART2_Init))
 <BR><BR>[Stack]<UL><LI>Max Depth = 100<LI>Call Chain = USART2_Init &rArr; UART_DMA_Init &rArr; USART_ITConfig
 </UL>
 <BR>[Calls]<UL><LI><a href="#[81]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;NVIC_Init
@@ -1124,7 +1124,7 @@ Global Symbols
 <BR><BR>[Called By]<UL><LI><a href="#[59]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;__printf
 </UL>
 
-<P><STRONG><a name="[4f]"></a>main</STRONG> (Thumb, 224 bytes, Stack size 16 bytes, main.o(i.main))
+<P><STRONG><a name="[4f]"></a>main</STRONG> (Thumb, 210 bytes, Stack size 16 bytes, main.o(i.main))
 <BR><BR>[Stack]<UL><LI>Max Depth = 256<LI>Call Chain = main &rArr; vTaskStartScheduler &rArr; prvCreateIdleTasks &rArr; xTaskCreate &rArr; prvCreateTask &rArr; pvPortMalloc &rArr; xTaskResumeAll &rArr; xTaskIncrementTick
 </UL>
 <BR>[Calls]<UL><LI><a href="#[ae]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;NVIC_PriorityGroupConfig
@@ -1271,7 +1271,7 @@ Global Symbols
 <BR><BR>[Called By]<UL><LI><a href="#[df]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;xPortStartScheduler
 </UL>
 
-<P><STRONG><a name="[3e]"></a>vTaskControl</STRONG> (Thumb, 194 bytes, Stack size 24 bytes, main.o(i.vTaskControl))
+<P><STRONG><a name="[3e]"></a>vTaskControl</STRONG> (Thumb, 180 bytes, Stack size 24 bytes, main.o(i.vTaskControl))
 <BR><BR>[Stack]<UL><LI>Max Depth = 136<LI>Call Chain = vTaskControl &rArr; xQueueGenericSend &rArr; vTaskPlaceOnEventList &rArr; prvAddCurrentTaskToDelayedList &rArr; vListInsert
 </UL>
 <BR>[Calls]<UL><LI><a href="#[69]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;IWDG_ReloadCounter
