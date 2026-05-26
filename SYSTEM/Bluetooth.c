@@ -52,8 +52,11 @@ void UART_DMA_Init(void)
 //DMA中断最好使用在固定长度数据，一次收n个字节
 void USART2_IRQHandler(void)
 {
+    //BaseType_t xHigherPriorityTaskWoken = pdFALSE;
     if(USART_GetITStatus(USART2,USART_IT_IDLE) != RESET)
     {
+        
+       
         // 🔥 清除IDLE标志（必须这样读）
         volatile uint32_t temp;
         temp = USART2->SR;
@@ -65,6 +68,8 @@ void USART2_IRQHandler(void)
         //DMA_GetCurrDataCounter(DMA1_Channel6)获取 DMA 通道 6 当前还剩下多少个数据没搬完。
         rx_len = RX_BUFFER_SIZE - DMA_GetCurrDataCounter(DMA1_Channel6);
 
+    
+
         // 👉 告诉任务：数据来了
         cmd_ready = 1;
 
@@ -72,6 +77,8 @@ void USART2_IRQHandler(void)
          //给 DMA 通道 6 设置【本次要传输多少个数据】= 重新装填 DMA 的 “计数器”
         DMA_SetCurrDataCounter(DMA1_Channel6, RX_BUFFER_SIZE);
         DMA_Cmd(DMA1_Channel6, ENABLE);
+
+        
     }
 }
 
@@ -142,7 +149,7 @@ void USART2_Init()
     // //USART_ITConfig(USART2, USART_IT_RXNE, ENABLE);/*USART_IT_RXNE：接收寄存器非空（有新数据可读）
     //                                             - USART_IT_TXE：发送缓冲区空（可以发送下一个数据）
     //                                             - USART_IT_TC：发送完成*/
-    //NVIC_EnableIRQ(USART2_IRQn);   // 开启 USART2 中断,中断控制器
+    NVIC_EnableIRQ(USART2_IRQn);   // 开启 USART2 中断,中断控制器
 
 }
 

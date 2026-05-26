@@ -6,6 +6,14 @@
 #define RX_BUFFER_SIZE 100
 //#define BUF_SIZE 50
 
+
+typedef struct
+{
+    uint8_t data[RX_BUFFER_SIZE];
+    uint16_t len;
+} UartMsg_t;
+
+
 extern uint8_t rx_buffer[RX_BUFFER_SIZE];   // DMA接收缓冲区
 extern uint16_t rx_len;
 

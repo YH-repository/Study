@@ -30,11 +30,18 @@ static uint8_t smoke_alarm = 0;
 // uint32_t t_uart = 0;
 //uint8_t auto_flag = 0; // //0???????1?????
 
-typedef enum
-{
-    STATE_IDLE,        // 空闲（手动控制）
-    STATE_AUTO_ACTIVE  // 自动控制中
-} SystemState;
+typedef enum {
+    STATE_IDLE,          // 自动关闭
+    STATE_AUTO_ACTIVE,   // 自动开启
+    STATE_MANUAL         // 手动控制（临时）
+} SystemStatus;
+
+
+// typedef enum
+// {
+//     STATE_IDLE,        // 空闲（手动控制）
+//     STATE_AUTO_ACTIVE  // 自动控制中
+// } SystemState;
 
 
 
@@ -71,6 +78,7 @@ typedef struct
 QueueHandle_t xQueueSensor;
 QueueHandle_t xQueueState;
 //QueueHandle_t xQueueUART;
+QueueHandle_t xQueueCmd;
 
 
 //volatile uint16_t analog = 0;
@@ -125,8 +133,8 @@ void vTaskControl(void *pvParameters)
 {
     SensorData_t sensor;
     SystemState_t state;
-
-    SystemState states = STATE_IDLE;
+    SystemStatus cmd = STATE_IDLE;
+    //SystemState states = STATE_IDLE;
     while(1)
     {
 
@@ -154,22 +162,61 @@ void vTaskControl(void *pvParameters)
             uint8_t danger = (smoke_alarm == 1) || 
                              (sensor.digital == 0) || 
                              (sensor.Fire == 0);
-            if(danger)
+            if(xQueuePeek(xQueueCmd, &cmd, 0) == pdPASS)
             {
-                Led_lib_Ctrl(LED_ON);
-                motor_forward();//???
-                states = STATE_AUTO_ACTIVE;
-                    //	delay_ms(5000);
-            }
-            else
-            {
-                if (states == STATE_AUTO_ACTIVE)
+                switch(cmd)
                 {
-                    Led_lib_Ctrl(LED_OFF);
-                    motor_stop();
-                    states = STATE_IDLE;
-                }   
+                    case STATE_IDLE:
+                    {
+                        Led_lib_Ctrl(LED_OFF);
+                        motor_stop();
+                        if(danger)
+                        {
+                            cmd = STATE_AUTO_ACTIVE;
+                        }
+                        break;
+                    }
+                    case STATE_AUTO_ACTIVE:
+                    {
+                        Led_lib_Ctrl(LED_ON);
+                        motor_forward();//???
+                        if(!danger)
+                        {
+                            cmd = STATE_IDLE;
+                        }
+                        break;
+                    }
+
+                    case STATE_MANUAL:
+                    {
+                        // ? 关键点：自动可以“抢回控制权”
+                        if(danger)
+                        {
+                            cmd = STATE_AUTO_ACTIVE;   // 覆盖手动
+                        }
+                        break;
+                    }
+                }
             }
+            
+            
+
+            // if(danger)
+            // {
+            //     Led_lib_Ctrl(LED_ON);
+            //     motor_forward();//???
+            //     states = STATE_AUTO_ACTIVE;
+            //         //	delay_ms(5000);
+            // }
+            // else
+            // {
+            //     if (states == STATE_AUTO_ACTIVE)
+            //     {
+            //         Led_lib_Ctrl(LED_OFF);
+            //         motor_stop();
+            //         states = STATE_IDLE;
+            //     }   
+            // }
             //更新数据
             state.analog = sensor.analog;
             state.motor = motor_state;
@@ -180,7 +227,7 @@ void vTaskControl(void *pvParameters)
         }
         
 
-        vTaskDelay(pdMS_TO_TICKS(100));
+        //vTaskDelay(pdMS_TO_TICKS(100));
     }
 }
 
@@ -192,7 +239,7 @@ void vTaskOLED(void *pvParameters)
 
     while(1)
     {
-        if(xQueueReceive(xQueueState,&state,0) == pdPASS)
+        if(xQueuePeek(xQueueState,&state,portMAX_DELAY) == pdPASS)
         {
             if(state.Fire == 1)
                 OLED_ShowChinese(48,16,"无火");
@@ -226,6 +273,7 @@ void vTaskOLED(void *pvParameters)
 void vTaskUART(void *pvParameters)
 {
     SystemState_t state;
+    SystemStatus cmd;
     while(1)
     {
         //1秒发一次
@@ -272,7 +320,8 @@ void vTaskUART(void *pvParameters)
                 
                 USART2_SendString("open success\r\n");
 				USART2_SendString("please enter the command\r\n");			
-
+                cmd = STATE_MANUAL;
+                xQueueSend(xQueueCmd, &cmd, 0);
             }
             else if(strstr((char *)rx_buffer,"offlight") != NULL)
             {
@@ -283,6 +332,8 @@ void vTaskUART(void *pvParameters)
                 USART2_SendString((char *)rx_buffer);
                 USART2_SendString(" success\r\n");
                 USART2_SendString("please enter the command1\r\n");
+                cmd = STATE_MANUAL;
+                xQueueSend(xQueueCmd, &cmd, 0);
             }
             else if(strstr((char *)rx_buffer,"onmotor") != NULL)
             {
@@ -293,6 +344,8 @@ void vTaskUART(void *pvParameters)
                 USART2_SendString((char *)rx_buffer);
                 USART2_SendString(" success\r\n");
                 USART2_SendString("please enter the command1\r\n");
+                cmd = STATE_MANUAL;
+                xQueueSend(xQueueCmd, &cmd, 0);
             }
             else if(strstr((char *)rx_buffer,"offmotor") != NULL)
             {
@@ -303,6 +356,8 @@ void vTaskUART(void *pvParameters)
                 USART2_SendString((char *)rx_buffer);
                 USART2_SendString(" success\r\n");
                 USART2_SendString("please enter the command1\r\n");
+                cmd = STATE_MANUAL;
+                xQueueSend(xQueueCmd, &cmd, 0);
             }
             else
             {
@@ -348,6 +403,7 @@ int main()
     xQueueSensor = xQueueCreate(5, sizeof(SensorData_t));
     //用 overwrite,xQueueState 用 长度=1（关键！）是为了获取的是最新的数据
     xQueueState  = xQueueCreate(1, sizeof(SystemState_t)); 
+    xQueueCmd = xQueueCreate(1, sizeof(SystemStatus)); 
     //xQueueUART   = xQueueCreate(1, sizeof(SystemState_t));
 
 
@@ -889,4 +945,3 @@ int main()
 //     // }
   
 // }
-
