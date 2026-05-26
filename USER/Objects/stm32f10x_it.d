@@ -31,3 +31,15 @@
 .\objects\stm32f10x_it.o: ..\FWLIB\inc\misc.h
 .\objects\stm32f10x_it.o: ..\SYSTEM\Delay.h
 .\objects\stm32f10x_it.o: ..\SYSTEM\Bluetooth.h
+.\objects\stm32f10x_it.o: ..\FreeRTOS\include\FreeRTOS.h
+.\objects\stm32f10x_it.o: D:\Keil_v5\ARM\ARMCC\Bin\..\include\stddef.h
+.\objects\stm32f10x_it.o: ..\FreeRTOS\include\FreeRTOSConfig.h
+.\objects\stm32f10x_it.o: ..\FreeRTOS\include\projdefs.h
+.\objects\stm32f10x_it.o: ..\FreeRTOS\include\portable.h
+.\objects\stm32f10x_it.o: ..\FreeRTOS\include\deprecated_definitions.h
+.\objects\stm32f10x_it.o: ..\FreeRTOS\portable\ARM_CM3\portmacro.h
+.\objects\stm32f10x_it.o: ..\FreeRTOS\include\mpu_wrappers.h
+.\objects\stm32f10x_it.o: ..\FreeRTOS\include\queue.h
+.\objects\stm32f10x_it.o: ..\FreeRTOS\include\task.h
+.\objects\stm32f10x_it.o: ..\FreeRTOS\include\list.h
+.\objects\stm32f10x_it.o: D:\Keil_v5\ARM\ARMCC\Bin\..\include\string.h

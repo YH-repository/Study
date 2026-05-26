@@ -13,7 +13,7 @@
 #include "FreeRTOS.h"
 #include "task.h"
 #include "semphr.h"
-#include "queue.h"//必须放在freertos的上面
+#include "queue.h"//必须放在freertos的下面
 #include "IWDG.h"
 
 
@@ -36,12 +36,7 @@ typedef enum {
     STATE_MANUAL         // 手动控制（临时）
 } SystemStatus;
 
-typedef enum {
-    CMD_LIGHT_ON,
-    CMD_MOTOR_ON,
-    CMD_MOTOR_OFF,
-    CMD_LIGHT_OFF
-} ControlCmd_t;
+
 
 // typedef enum
 // {
@@ -84,7 +79,7 @@ typedef struct
 QueueHandle_t xQueueSensor;
 QueueHandle_t xQueueState;
 //QueueHandle_t xQueueUART;
-QueueHandle_t xQueueCmd;
+
 
 
 //volatile uint16_t analog = 0;
@@ -304,7 +299,7 @@ void vTaskOLED(void *pvParameters)
 void vTaskUART(void *pvParameters)
 {
     SystemState_t state;
-    ControlCmd_t cmd;
+    //ControlCmd_t cmd;
     while(1)
     {
         //1秒发一次
@@ -329,8 +324,9 @@ void vTaskUART(void *pvParameters)
         {
             
             cmd_ready = 0;
+            Parse_Frame(rx_buffer, rx_len);
             // ?补结束符
-            rx_buffer[rx_len] = '\0';
+            //rx_buffer[rx_len] = '\0';
             // buf[buf_index] = '\0';
             // for(int i = 0; i < buf_index; i++)
             // {
@@ -341,61 +337,61 @@ void vTaskUART(void *pvParameters)
             // }
             // buf_index = 0;
 
-            if(strstr((char *)rx_buffer,"onlight") != NULL)
-            {
-               //OLED_ShowString(0,0,"ENTER ONLIGHT",16); // 测试用
+            // if(strstr((char *)rx_buffer,"onlight") != NULL)
+            // {
+            //    //OLED_ShowString(0,0,"ENTER ONLIGHT",16); // 测试用
                 
-              //  Led_lib_Ctrl(LED_ON);
-                // USART2_SendString((char *)buf);
-                //auto_flag = 0;
+            //   //  Led_lib_Ctrl(LED_ON);
+            //     // USART2_SendString((char *)buf);
+            //     //auto_flag = 0;
                 
-                USART2_SendString("open success\r\n");
-				USART2_SendString("please enter the command\r\n");			
-                cmd = CMD_LIGHT_ON;
-                xQueueSend(xQueueCmd, &cmd, 0);
-            }
-            else if(strstr((char *)rx_buffer,"offlight") != NULL)
-            {
+            //     USART2_SendString("open success\r\n");
+			// 	USART2_SendString("please enter the command\r\n");			
+            //     cmd = CMD_LIGHT_ON;
+            //     xQueueSend(xQueueCmd, &cmd, 0);
+            // }
+            // else if(strstr((char *)rx_buffer,"offlight") != NULL)
+            // {
                 
-                //Led_lib_Ctrl(LED_OFF);
-                //auto_flag = 0;
+            //     //Led_lib_Ctrl(LED_OFF);
+            //     //auto_flag = 0;
                 
-                USART2_SendString((char *)rx_buffer);
-                USART2_SendString(" success\r\n");
-                USART2_SendString("please enter the command1\r\n");
-                cmd = CMD_LIGHT_OFF;
-                xQueueSend(xQueueCmd, &cmd, 0);
-            }
-            else if(strstr((char *)rx_buffer,"onmotor") != NULL)
-            {
+            //     USART2_SendString((char *)rx_buffer);
+            //     USART2_SendString(" success\r\n");
+            //     USART2_SendString("please enter the command1\r\n");
+            //     cmd = CMD_LIGHT_OFF;
+            //     xQueueSend(xQueueCmd, &cmd, 0);
+            // }
+            // else if(strstr((char *)rx_buffer,"onmotor") != NULL)
+            // {
                 
-                //motor_forward_pwm(1000); 
-                //light_state = 1; 
-                //auto_flag = 0;
-                USART2_SendString((char *)rx_buffer);
-                USART2_SendString(" success\r\n");
-                USART2_SendString("please enter the command1\r\n");
-                cmd = CMD_MOTOR_ON;
-                xQueueSend(xQueueCmd, &cmd, 0);
-            }
-            else if(strstr((char *)rx_buffer,"offmotor") != NULL)
-            {
+            //     //motor_forward_pwm(1000); 
+            //     //light_state = 1; 
+            //     //auto_flag = 0;
+            //     USART2_SendString((char *)rx_buffer);
+            //     USART2_SendString(" success\r\n");
+            //     USART2_SendString("please enter the command1\r\n");
+            //     cmd = CMD_MOTOR_ON;
+            //     xQueueSend(xQueueCmd, &cmd, 0);
+            // }
+            // else if(strstr((char *)rx_buffer,"offmotor") != NULL)
+            // {
                 
-                //motor_stop_pwm();
-                //light_state = 0; 
-                //auto_flag = 0;
-                USART2_SendString((char *)rx_buffer);
-                USART2_SendString(" success\r\n");
-                USART2_SendString("please enter the command1\r\n");
-                cmd = CMD_MOTOR_OFF;
-                xQueueSend(xQueueCmd, &cmd, 0);
-            }
-            else
-            {
-                USART2_SendString((char *)rx_buffer);
-                USART2_SendString(" send error!!\r\n");
-                USART2_SendString("please enter the valid command\r\n");
-            }
+            //     //motor_stop_pwm();
+            //     //light_state = 0; 
+            //     //auto_flag = 0;
+            //     USART2_SendString((char *)rx_buffer);
+            //     USART2_SendString(" success\r\n");
+            //     USART2_SendString("please enter the command1\r\n");
+            //     cmd = CMD_MOTOR_OFF;
+            //     xQueueSend(xQueueCmd, &cmd, 0);
+            // }
+            // else
+            // {
+            //     USART2_SendString((char *)rx_buffer);
+            //     USART2_SendString(" send error!!\r\n");
+            //     USART2_SendString("please enter the valid command\r\n");
+            // }
 			 			
         }
         vTaskDelay(pdMS_TO_TICKS(10));

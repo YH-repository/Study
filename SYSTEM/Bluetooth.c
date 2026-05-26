@@ -1,18 +1,112 @@
 #include "Bluetooth.h"
-#include "led.h"
+
 
 
 
 uint8_t rx_buffer[RX_BUFFER_SIZE];   // DMA接收缓冲区
 uint16_t rx_len = 0;                // 实际接收长度
 
-
+QueueHandle_t xQueueCmd;
 //volatile char buf[BUF_SIZE];
 //volatile int buf_index = 0;
 volatile uint8_t cmd_ready = 0;//接收完成标志
 
 //volatile uint32_t rx_timeout = 0;   // 超时计数
 
+void Parse_Frame(uint8_t *buf, uint16_t len)
+{
+    static uint8_t frame[50];
+    static uint8_t index = 0;
+    static uint8_t receiving = 0;
+
+
+    if(buf[0] != FRAME_HEAD || buf[len-1] != FRAME_TAIL)
+    {
+        USART2_SendString((char *)frame);
+        USART2_SendString(" send error!!\r\n");
+        USART2_SendString("please enter the valid command\r\n");
+        return;
+    }
+
+    for(int i = 0; i < len; i++)
+    {
+        uint8_t data = buf[i];
+
+        /* 帧头 */
+        if(data == FRAME_HEAD)
+        {
+            receiving = 1;
+            index = 0;
+        }
+        /* 帧尾 */
+        else if(data == FRAME_TAIL && receiving)
+        {
+            frame[index] = '\0';
+            // if(i != len - 1)
+            // {
+            //     USART2_SendString((char *)frame);
+            //     USART2_SendString(" send error!!\r\n");
+            //     USART2_SendString("please enter the valid command\r\n");
+            //     receiving = 0;
+            //     return;
+            // }
+            ControlCmd_t cmd = CMD_NONE;
+
+            if(strcmp((char*)frame, "onmotor") == 0)
+                {
+                    cmd = CMD_MOTOR_ON;
+                    USART2_SendString((char *)frame);
+                    USART2_SendString(" success\r\n");
+                    USART2_SendString("please enter the command1\r\n");
+                }
+            else if(strcmp((char*)frame, "offmotor") == 0)
+                {
+                    cmd = CMD_MOTOR_OFF;
+                    USART2_SendString((char *)frame);
+                    USART2_SendString(" success\r\n");
+				    USART2_SendString("please enter the command\r\n");
+                }
+            else if(strcmp((char *)frame,"onlight") == 0)
+                {
+                    cmd = CMD_LIGHT_ON;
+                    USART2_SendString((char *)frame);
+                    USART2_SendString(" success\r\n");
+				    USART2_SendString("please enter the command\r\n");
+                }
+            else if(strcmp((char*)frame, "offlight") == 0)
+                {
+                    cmd = CMD_LIGHT_OFF;
+                    USART2_SendString((char *)frame);
+                    USART2_SendString(" success\r\n");
+                    USART2_SendString("please enter the command1\r\n");
+                }
+            else
+                {
+                    USART2_SendString((char *)frame);
+                    USART2_SendString(" send error!!\r\n");
+                    USART2_SendString("please enter the valid command\r\n");
+                }
+            if(cmd != CMD_NONE)
+            {
+                xQueueSend(xQueueCmd, &cmd, 0);
+            }
+
+            receiving = 0;
+        }
+        /* 数据 */
+        else if(receiving)
+        {
+            if(index < sizeof(frame) - 1)
+            {
+                frame[index++] = data;
+            }
+            else
+            {
+                receiving = 0; // 防溢出
+            }
+        }
+    }
+}
 
 void UART_DMA_Init(void)
 {
